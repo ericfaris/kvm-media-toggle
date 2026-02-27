@@ -6,16 +6,13 @@ An AutoHotkey v2 script that automatically pauses and resumes media playback whe
 
 If you use a KVM switch to share monitors between multiple computers (e.g., work and home), media playing in a web browser (podcasts, music, etc.) keeps playing after you switch away. You come back later to find your podcast has been running for hours, or you've lost your place entirely.
 
-There's no built-in way for the OS or browser to know that *you* are no longer at that computer when a KVM switches the display signal to another machine.
+There's no built-in way for the OS or browser to know that *you* are no longer at that computer when a KVM switches the display signal to another machine. High-end KVM switches with EDID and USB emulation make this harder — Windows doesn't even notice the monitors or devices are gone.
 
 ## How It Works
 
-When a KVM switch changes inputs, the monitors **disconnect** from the source PC — Windows sees the monitor count drop. This script exploits that:
+**Pause (switch away):** The script detects a double Right-Ctrl tap, which is the attention sequence used by many KVM switches (e.g., ConnectPRO, TESmart, Level1Techs). When detected, it sends the **Media Play/Pause** key to pause playback.
 
-1. Polls the monitor count every 2 seconds
-2. When monitors disappear (KVM switched away), sends the **Media Play/Pause** key to pause playback
-3. When monitors reappear (KVM switched back), waits for displays to initialize, then sends **Media Play/Pause** to resume
-4. Only resumes if *it* was the one that paused — won't interfere if you manually paused before switching
+**Resume (switch back):** After pausing, the script waits for the KVM to settle, then watches for mouse movement. When you switch back and move the mouse, it sends **Media Play/Pause** to resume.
 
 The media key approach works universally with any browser or app that responds to hardware media keys (Chrome, Edge, Firefox, Spotify, etc.).
 
@@ -36,9 +33,10 @@ Edit the variables at the top of the script:
 
 | Variable | Default | Description |
 |---|---|---|
-| `POLL_INTERVAL` | `2000` | How often to check monitor count (ms) |
-| `RESUME_DELAY` | `3000` | Delay before resuming after switch-back, giving displays time to initialize (ms) |
-| `EXPECTED_MONITORS` | `3` | Number of monitors when KVM is active on this PC |
+| `DOUBLE_TAP_MS` | `400` | Max time between RCtrl taps to count as double-tap (ms) |
+| `SETTLE_TIME` | `3000` | Wait after switch-away before watching for return (ms) |
+| `RETURN_POLL` | `250` | How often to check for mouse movement (ms) |
+| `RESUME_DELAY` | `500` | Wait before resuming after detecting return (ms) |
 
 ## Auto-Start with Windows
 
