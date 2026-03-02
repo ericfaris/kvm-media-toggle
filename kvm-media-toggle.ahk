@@ -8,15 +8,20 @@ Persistent
 ; when you switch back.
 ;
 ; Switch-away: Detects double RCtrl tap (KVM attention sequence)
-; Switch-back: Detects mouse movement after a settle period
+; Switch-back: Detects mouse movement after a settle period, refreshes
+;              the PocketCasts PWA so playback state syncs from the server
 ; =============================================================================
 
 ; --- Configuration -----------------------------------------------------------
 DOUBLE_TAP_MS    := 400    ; Max time between RCtrl taps to count as double (ms)
 SETTLE_TIME      := 3000   ; Wait after switch-away before watching for return (ms)
 RETURN_POLL      := 250    ; How often to check for mouse movement (ms)
-RESUME_DELAY     := 500    ; Wait before resuming after detecting return (ms)
+RESUME_DELAY     := 500    ; Wait before refreshing after detecting return (ms)
+REFRESH_TITLE    := "Pocket Casts"  ; Window title fragment for the PocketCasts tab
+REFRESH_WAIT     := 2500   ; Wait after page refresh before resuming playback (ms)
 ; -----------------------------------------------------------------------------
+
+SetTitleMatchMode(2)  ; Allow partial window title matching
 
 wasPaused := false
 lastRCtrl := 0
@@ -69,17 +74,53 @@ CheckMouseMove() {
     if (x != lastMouseX || y != lastMouseY) {
         ; Mouse moved — user is back
         SetTimer(CheckMouseMove, 0)
-        SetTimer(ResumeMedia, -RESUME_DELAY)
+        SetTimer(RefreshAndResume, -RESUME_DELAY)
+    }
+}
+
+RefreshAndResume() {
+    global wasPaused, REFRESH_TITLE, REFRESH_WAIT
+
+    if (!wasPaused)
+        return
+
+    hwnd := WinExist(REFRESH_TITLE)
+    if (hwnd) {
+        ; Save whatever window is currently active so we can restore focus
+        prevHwnd := WinExist("A")
+        WinActivate(hwnd)
+        WinWaitActive(hwnd, , 2)
+        Send("^r")  ; Ctrl+R — refresh the PocketCasts tab
+        ; Restore previous window focus if it wasn't already PocketCasts
+        if (prevHwnd && prevHwnd != hwnd)
+            WinActivate(prevHwnd)
+        ; Wait for the page to finish loading, then resume playback
+        SetTimer(ResumeMedia, -REFRESH_WAIT)
+    } else {
+        ; PocketCasts tab not found — fall back to plain resume
+        ResumeMedia()
     }
 }
 
 ResumeMedia() {
-    global wasPaused
-    if (wasPaused) {
-        Send("{Media_Play_Pause}")
-        wasPaused := false
-        UpdateTray(true, false)
+    global wasPaused, REFRESH_TITLE
+    if (!wasPaused)
+        return
+
+    hwnd := WinExist(REFRESH_TITLE)
+    if (hwnd) {
+        prevHwnd := WinExist("A")
+        WinActivate(hwnd)
+        WinWaitActive(hwnd, , 2)
+        Send("{Space}")  ; Spacebar plays/pauses within the PocketCasts PWA
+        if (prevHwnd && prevHwnd != hwnd)
+            WinActivate(prevHwnd)
+    } else {
+        Send("{Media_Play_Pause}")  ; Fallback if tab isn't found
     }
+
+    wasPaused := false
+    UpdateTray(true, false)
 }
 
 UpdateTray(active, paused) {
