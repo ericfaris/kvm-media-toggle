@@ -22,7 +22,7 @@ REFRESH_WAIT     := 5000   ; Wait after page refresh before sending resume key (
 REFRESH_TIMEOUT  := 5      ; Seconds to wait for PocketCasts window to appear
 ; -----------------------------------------------------------------------------
 
-SetTitleMatchMode(2)  ; Allow partial window title matching
+SetTitleMatchMode(1)  ; Match window titles from the start
 
 wasPaused := false
 lastRCtrl := 0
