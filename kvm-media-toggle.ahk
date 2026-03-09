@@ -18,7 +18,8 @@ SETTLE_TIME      := 3000   ; Wait after switch-away before watching for return (
 RETURN_POLL      := 250    ; How often to check for mouse movement (ms)
 RESUME_DELAY     := 500    ; Wait before refreshing after detecting return (ms)
 REFRESH_TITLE    := "Pocket Casts"  ; Window title fragment for the PocketCasts tab
-REFRESH_WAIT     := 2500   ; Wait after page refresh before resuming playback (ms)
+REFRESH_WAIT     := 5000   ; Wait after page refresh before sending resume key (ms)
+REFRESH_TIMEOUT  := 5      ; Seconds to wait for PocketCasts window to appear
 ; -----------------------------------------------------------------------------
 
 SetTitleMatchMode(2)  ; Allow partial window title matching
@@ -27,6 +28,7 @@ wasPaused := false
 lastRCtrl := 0
 lastMouseX := 0
 lastMouseY := 0
+pocketCastsHwnd := 0
 
 TraySetIcon("Shell32.dll", 138)
 UpdateTray(true, false)
@@ -79,46 +81,40 @@ CheckMouseMove() {
 }
 
 RefreshAndResume() {
-    global wasPaused, REFRESH_TITLE, REFRESH_WAIT
+    global wasPaused, REFRESH_TITLE, REFRESH_WAIT, REFRESH_TIMEOUT, pocketCastsHwnd
 
     if (!wasPaused)
         return
 
-    hwnd := WinExist(REFRESH_TITLE)
-    if (hwnd) {
+    pocketCastsHwnd := WinWait(REFRESH_TITLE, , REFRESH_TIMEOUT)
+    if (pocketCastsHwnd) {
         ; Save whatever window is currently active so we can restore focus
         prevHwnd := WinExist("A")
-        WinActivate(hwnd)
-        WinWaitActive(hwnd, , 2)
+        WinActivate(pocketCastsHwnd)
+        WinWaitActive(pocketCastsHwnd, , 2)
         Send("^r")  ; Ctrl+R — refresh the PocketCasts tab
         ; Restore previous window focus if it wasn't already PocketCasts
-        if (prevHwnd && prevHwnd != hwnd)
+        if (prevHwnd && prevHwnd != pocketCastsHwnd)
             WinActivate(prevHwnd)
-        ; Wait for the page to finish loading, then resume playback
-        SetTimer(ResumeMedia, -REFRESH_WAIT)
+        SetTimer(ResumePlayback, -REFRESH_WAIT)
     } else {
-        ; PocketCasts tab not found — fall back to plain resume
-        ResumeMedia()
+        ; Window never appeared — resume immediately with media key
+        ResumePlayback()
     }
 }
 
-ResumeMedia() {
-    global wasPaused, REFRESH_TITLE
-    if (!wasPaused)
-        return
-
-    hwnd := WinExist(REFRESH_TITLE)
-    if (hwnd) {
+ResumePlayback() {
+    global wasPaused, pocketCastsHwnd
+    if (pocketCastsHwnd) {
         prevHwnd := WinExist("A")
-        WinActivate(hwnd)
-        WinWaitActive(hwnd, , 2)
-        Send("{Space}")  ; Spacebar plays/pauses within the PocketCasts PWA
-        if (prevHwnd && prevHwnd != hwnd)
+        WinActivate(pocketCastsHwnd)
+        WinWaitActive(pocketCastsHwnd, , 2)
+        Send("{Space}")
+        if (prevHwnd && prevHwnd != pocketCastsHwnd)
             WinActivate(prevHwnd)
     } else {
-        Send("{Media_Play_Pause}")  ; Fallback if tab isn't found
+        Send("{Media_Play_Pause}")
     }
-
     wasPaused := false
     UpdateTray(true, false)
 }
